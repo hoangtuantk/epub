@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-NYZWBK6120"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-K9CK2BHBDQ'); //Root domain
+    gtag('config', 'G-NYZWBK6120'); //Subdomain
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trình Đọc Ebook</title>
+  <link rel="icon" type="image/png" href="/404/logo.png" />
+  <link rel="stylesheet" href="src/scss/style.css">
+</head>
+
+<body>
+  <div id="app-container">
+    <div id="viewer-container">
+      <div id="prev-area" title="Chương trước"></div>
+      <div id="next-area" title="Chương sau"></div>
+
+      <div id="viewer">
+        <div id="welcome-screen">
+          <div id="welcome-main">
+            <h1>Trình Đọc Ebook</h1>
+            <p>Mở một cuốn sách để bắt đầu đọc.</p>
+            <p>Web chỉ phù hợp với màn hình rộng [PC, iPad].</p>
+            <label for="file-input" class="button">Mở File (EPUB, TXT)</label>
+            <input type="file" id="file-input" accept=".epub,.txt" multiple>
+          </div>
+
+          <div id="imported-files-container">
+            <div id="imported-files-header">
+              <h2>Sách đã nhập</h2>
+              <select id="sort-books-select">
+                <option value="lastOpened">Sắp xếp: Mới đọc nhất</option>
+                <option value="title-asc">Sắp xếp: Theo tên (A-Z)</option>
+                <option value="title-desc">Sắp xếp: Theo tên (Z-A)</option>
+              </select>
+            </div>
+            <ul id="imported-files-list">
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <header id="top-bar">
+      <div class="top-bar-left">
+        <button id="home-btn" class="icon-btn" title="Trang chủ">
+          <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px" fill="currentColor">
+            <path d="M0 0h24v24H0z" fill="none" />
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+          </svg>
+        </button>
+        <button id="toc-btn" class="icon-btn" title="Mục lục">&#9776;</button>
+        <span id="book-title" aria-hidden="true"></span>
+      </div>
+      <div class="top-bar-right">
+        <span id="chapter-info" aria-hidden="true"></span>
+        <button id="history-btn" class="icon-btn" title="Lịch sử đọc">&#128337;</button>
+        <button id="settings-btn" class="icon-btn" title="Cài đặt">&#9881;</button>
+      </div>
+    </header>
+  </div>
+
+  <div id="toc-modal" class="modal-overlay hidden">
+    <div class="modal-content" id="toc-content">
+      <div class="modal-header">
+        <h2>Mục lục</h2>
+        <button class="close-btn" data-target="toc-modal"></button>
+      </div>
+      <input type="text" id="toc-search" placeholder="Tìm kiếm chương...">
+      <ul id="toc-list"></ul>
+    </div>
+  </div>
+
+  <div id="history-modal" class="modal-overlay hidden">
+    <div class="modal-content" id="history-content">
+      <div class="modal-header">
+        <h2>Lịch sử đọc</h2>
+        <button class="close-btn" data-target="history-modal"></button>
+      </div>
+      <ul id="history-list"></ul>
+    </div>
+  </div>
+
+  <aside id="settings-sidebar" class="hidden">
+    <div class="modal-header">
+      <h2>Cài đặt</h2>
+      <button class="close-btn" data-target="settings-sidebar"></button>
+    </div>
+    <div class="settings-content">
+      <div class="setting-item">
+        <label class="toggle-label">
+          <span>Giữ định dạng gốc EPUB</span>
+          <div class="toggle-switch-container">
+            <input type="checkbox" id="original-format-toggle" class="toggle-switch">
+            <span class="slider"></span>
+          </div>
+        </label>
+      </div>
+      <div class="setting-item" data-setting-control>
+        <label for="font-size-input">Cỡ chữ: <span id="font-size-value">32</span>px</label>
+        <input type="range" id="font-size-input" min="12" max="50" value="32">
+      </div>
+      <div class="setting-item" data-setting-control>
+        <label for="font-family-select">Kiểu chữ:</label>
+        <select id="font-family-select"></select>
+      </div>
+      <div class="setting-item" data-setting-control>
+        <label>Giao diện đọc & ứng dụng:</label>
+        <div id="color-themes-container"></div>
+        <button id="add-theme-btn" class="button" style="width: 100%; margin-top: 15px;">Thêm Giao diện mới</button>
+      </div>
+      <div class="setting-item" data-setting-control>
+        <label>Tùy chỉnh màu:</label>
+        <div class="custom-color-picker">
+          <div>
+            <label for="bg-color-picker">Màu nền</label>
+            <input type="color" id="bg-color-picker">
+          </div>
+          <div>
+            <label for="text-color-picker">Màu chữ</label>
+            <input type="color" id="text-color-picker">
+          </div>
+        </div>
+      </div>
+      <div class="setting-item">
+        <label>Dữ liệu ứng dụng:</label>
+        <button id="delete-all-data" class="danger-btn">Xoá Toàn Bộ Dữ Liệu</button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="custom-alert-overlay" class="modal-overlay hidden">
+    <div class="custom-alert-box">
+      <p id="custom-alert-message"></p>
+      <div class="custom-alert-buttons">
+        <button id="custom-alert-cancel" class="button-secondary">Hủy</button>
+        <button id="custom-alert-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="custom-prompt-overlay" class="modal-overlay hidden">
+    <div class="custom-prompt-box">
+      <p id="custom-prompt-message"></p>
+      <input type="text" id="custom-prompt-input" placeholder="Nhập tên ở đây...">
+      <div class="custom-prompt-buttons">
+        <button id="custom-prompt-cancel" class="button-secondary">Hủy</button>
+        <button id="custom-prompt-ok">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="book-info-modal" class="modal-overlay hidden">
+    <div class="modal-content" id="book-info-content">
+      <div class="modal-header">
+        <h2>Thông tin sách</h2>
+        <button class="close-btn" data-target="book-info-modal"></button>
+      </div>
+      <div id="book-info-details">
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/jszip.min.js"></script>
+  <script src="lib/epub.min.js"></script>
+  <script type="module" src="src/js/main.js"></script>
+</body>
+
+</html>

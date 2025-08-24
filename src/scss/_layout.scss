@@ -1,0 +1,163 @@
+#app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#viewer-container {
+  flex-grow: 1;
+  position: relative;
+  min-height: 0;
+}
+
+#viewer {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  // Scrollbar (gộp từ nhiều nơi)
+  &::-webkit-scrollbar {
+    width: 12px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--surface-bg);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+    border-radius: 20px;
+    border: 3px solid var(--surface-bg);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: #555;
+  }
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--surface-bg);
+}
+
+#welcome-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+  text-align: center;
+  overflow-y: auto;
+}
+
+#welcome-main {
+  padding: 40px 0;
+}
+
+#welcome-main h1 {
+  font-size: 2.5em;
+  margin-bottom: 10px;
+}
+
+#welcome-main p {
+  font-size: 1.2em;
+  opacity: .7;
+  margin-bottom: 30px;
+}
+
+#prev-area,
+#next-area {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8%;
+  height: 100%;
+  z-index: 10;
+  cursor: pointer;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgba(0, 0, 0, .4);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, .4);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity .2s;
+    line-height: 1;
+    padding-bottom: 2px;
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
+}
+
+#prev-area {
+  left: 0;
+
+  &::before {
+    content: '‹';
+    left: 15px;
+  }
+}
+
+#next-area {
+  right: 20px;
+
+  &::before {
+    content: '›';
+    right: 15px;
+  }
+}
+
+#top-bar {
+  height: var(--top-bar-height);
+  background-color: var(--surface-bg);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 25px;
+  z-index: 20;
+  color: var(--app-text);
+  flex-shrink: 0;
+}
+
+.top-bar-left,
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.top-bar-left {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.top-bar-right {
+  flex-shrink: 0;
+}
+
+#book-title,
+#chapter-info {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+#chapter-info {
+  text-align: right;
+}
