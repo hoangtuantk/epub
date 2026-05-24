@@ -191,7 +191,8 @@ export function updateChapterInfo(location) {
     window.history.replaceState(null, '', '/?n=' + bookSlug + '#' + currentIndex + '?t=' + chapterSlug);
 
     // 4. Đổi tiêu đề tab trình duyệt đúng cấu trúc (Ví dụ: Ebook | Đế Bá | Chương 09: Bạo lực)
-    document.title = '' + bookTitle + ' | ' + chapterTitle;
+    //document.title = 'Ebook' + bookTitle + ' | ' + chapterTitle;
+    document.title = chapterTitle;
   }
 }
 
