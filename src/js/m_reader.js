@@ -155,25 +155,133 @@ export function updateBookInfo(title, chapterText = "") {
 export function updateChapterInfo(location) {
   const currentChapter = ctx.book.navigation.get(location.start.href);
   if (currentChapter && currentChapter.label) {
-    const totalChapters = ctx.book.navigation.toc.length;
-    const currentIndex = ctx.book.navigation.toc.findIndex(item => item.href === currentChapter.href) + 1;
+
+    // Gộp tất cả các mục lớn/nhỏ lại để đếm tổng số chương chính xác
+    const flatToc = [];
+    function flatten(items) {
+      items.forEach(item => {
+        flatToc.push(item);
+        if (item.subitems) flatten(item.subitems);
+      });
+    }
+    flatten(ctx.book.navigation.toc);
+
+    const totalChapters = flatToc.length;
+    const currentIndex = flatToc.findIndex(item => item.href === currentChapter.href) + 1;
+
     ctx.chapterInfoEl.textContent = `${currentIndex}/${totalChapters} - ${currentChapter.label.trim()}`;
+
+    // 1. Tự động lấy và xử lý TÊN TRUYỆN thành dạng viết liền không dấu (Ví dụ: "de-ba")
+    const bookTitle = ctx.book.package.metadata.title || "truyen";
+    const bookSlug = bookTitle.toString().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[^a-z0-9 -]/g, '')
+      .replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+
+    // 2. Tự động lấy và xử lý TIÊU ĐỀ CHƯƠNG thành dạng viết liền không dấu (Ví dụ: "chuong-09-bao-luc")
+    const chapterTitle = currentChapter.label.trim();
+    const chapterSlug = chapterTitle.toString().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[^a-z0-9 -]/g, '')
+      .replace(/\s+/g, '-').replace(/-+/g, '-').trim();
+
+    // 3. Đổi đường link hiển thị đúng cấu trúc (Ví dụ: /?n=de-ba#11?t=chuong-09-bao-luc)
+    window.history.replaceState(null, '', '/?n=' + bookSlug + '#' + currentIndex + '?t=' + chapterSlug);
+
+    // 4. Đổi tiêu đề tab trình duyệt đúng cấu trúc (Ví dụ: Ebook | Đế Bá | Chương 09: Bạo lực)
+    document.title = '' + bookTitle + ' | ' + chapterTitle;
   }
 }
 
 export function populateTOC(toc) {
   ctx.tocList.innerHTML = '';
   if (!toc || toc.length === 0) { ctx.tocList.innerHTML = '<li>Không có mục lục.</li>'; return; }
-  toc.forEach(item => {
-    const li = document.createElement('li');
-    li.textContent = item.label.trim();
-    li.dataset.href = item.href;
-    li.addEventListener('click', () => {
-      if (ctx.rendition) ctx.rendition.display(item.href);
-      ctx.tocModal.classList.add('hidden');
+
+  // Hàm đệ quy tạo danh sách dạng Accordion (Thu gọn/Mở rộng)
+  function renderTocItems(items, parentUl) {
+    items.forEach(item => {
+      const li = document.createElement('li');
+      // Tắt CSS mặc định để ta tự trang trí
+      li.style.padding = '0';
+      li.style.borderBottom = 'none';
+
+      // Tạo vùng bọc chứa tiêu đề và nút bấm (trên 1 hàng ngang)
+      const itemDiv = document.createElement('div');
+      itemDiv.style.padding = '12px 20px';
+      itemDiv.style.borderBottom = '1px solid var(--border-color)';
+      itemDiv.style.display = 'flex';
+      itemDiv.style.justifyContent = 'space-between';
+      itemDiv.style.alignItems = 'center';
+      itemDiv.style.cursor = 'pointer';
+
+      // Hiệu ứng đổi màu khi di chuột qua
+      itemDiv.addEventListener('mouseenter', () => itemDiv.style.backgroundColor = 'rgba(255, 255, 255, 0.05)');
+      itemDiv.addEventListener('mouseleave', () => itemDiv.style.backgroundColor = 'transparent');
+
+      // Phần chữ (Bấm vào đây để chuyển chương sách)
+      const textSpan = document.createElement('span');
+      textSpan.textContent = item.label.trim();
+      textSpan.style.flexGrow = '1';
+      textSpan.addEventListener('click', () => {
+        if (ctx.rendition) ctx.rendition.display(item.href);
+        ctx.tocModal.classList.add('hidden');
+      });
+
+      itemDiv.appendChild(textSpan);
+
+      // Nếu mục này CÓ chứa các mục lục con bên trong
+      if (item.subitems && item.subitems.length > 0) {
+        // Tạo nút bấm hình mũi tên ▼
+        const toggleBtn = document.createElement('span');
+        toggleBtn.className = 'toc-toggle'; // Đặt tên class để hàm tìm kiếm phía dưới sử dụng
+        toggleBtn.innerHTML = '&#9660;'; // Mã HTML của hình mũi tên
+        toggleBtn.style.padding = '5px 15px';
+        toggleBtn.style.fontSize = '12px';
+        toggleBtn.style.transition = 'transform 0.3s';
+        toggleBtn.style.transform = 'rotate(-90deg)'; // Mặc định mũi tên nằm ngang (trạng thái Đóng)
+
+        // Tạo thư mục con (Ẩn đi theo mặc định)
+        const subUl = document.createElement('ul');
+        subUl.style.display = 'block';
+        subUl.style.listStyle = 'none';
+        subUl.style.paddingLeft = '20px'; // Thụt lề vào trong cho đẹp
+        subUl.style.margin = '0';
+
+        // Mũi tên chỉ xuống mặc định
+        toggleBtn.style.transform = 'rotate(0deg)';
+
+        // Lệnh kích hoạt khi bấm vào mũi tên: Đóng/Mở thư mục
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation(); // Ngăn việc click nhầm sang phần chữ đọc truyện
+          if (subUl.style.display === 'none') {
+            subUl.style.display = 'block'; // Mở
+            toggleBtn.style.transform = 'rotate(0deg)'; // Mũi tên chỉ xuống
+          } else {
+            subUl.style.display = 'none'; // Đóng
+            toggleBtn.style.transform = 'rotate(-90deg)'; // Mũi tên chỉ ngang
+          }
+        });
+
+        itemDiv.appendChild(toggleBtn);
+        li.appendChild(itemDiv);
+
+        // Tiếp tục quét các mục con bên trong (vòng lặp đệ quy)
+        renderTocItems(item.subitems, subUl);
+        li.appendChild(subUl);
+      } else {
+        // Không có thư mục con thì chỉ hiển thị tiêu đề
+        li.appendChild(itemDiv);
+      }
+
+      parentUl.appendChild(li);
     });
-    ctx.tocList.appendChild(li);
-  });
+  }
+
+  // Xóa khoảng cách thừa của danh sách gốc
+  ctx.tocList.style.padding = '0';
+  renderTocItems(toc, ctx.tocList);
 }
 
 export function filterTOC() {
@@ -235,3 +343,31 @@ export function deleteBookFromWelcomeScreen(bookId) {
     }
   });
 }
+
+// Logic xử lý nút Tìm kiếm toàn văn
+document.getElementById('search-btn').addEventListener('click', async () => {
+  const query = prompt("Nhập từ khóa cần tìm trong sách:");
+  if (!query) return;
+
+  // Hiển thị thông báo đang tìm kiếm (do tìm toàn bộ sách sẽ mất chút thời gian)
+  const originalText = ctx.chapterInfoEl.textContent;
+  ctx.chapterInfoEl.textContent = "Đang tìm kiếm...";
+
+  // Quét toàn bộ nội dung trong các chương
+  let results = [];
+  for (let spineItem of ctx.book.spine.spineItems) {
+    let content = await spineItem.load(ctx.book.load.bind(ctx.book));
+    let matches = spineItem.find(query);
+    results = results.concat(matches);
+  }
+
+  ctx.chapterInfoEl.textContent = originalText; // Trả lại text cũ
+
+  if (results.length === 0) {
+    alert("Không tìm thấy kết quả nào!");
+  } else {
+    // Nếu tìm thấy, chuyển tới kết quả đầu tiên
+    alert(`Tìm thấy ${results.length} kết quả. Đang chuyển đến vị trí đầu tiên...`);
+    ctx.rendition.display(results[0].cfi);
+  }
+});
