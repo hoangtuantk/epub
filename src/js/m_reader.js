@@ -84,7 +84,32 @@ export function renderEpub(bookData, title) {
       populateTOC(ctx.book.navigation.toc);
       loadSettings();
       applyReaderSettings();
+      // --- TÍNH DUNG LƯỢNG CÁC CHƯƠNG ĐỂ LÀM % CHUẨN ---
+      try {
+        const spineItems = ctx.book.spine.spineItems || [];
+        ctx.spineSizes = [];
+        ctx.totalSpineSize = 0;
+        const zip = ctx.book.archive?.zip || ctx.book.archive;
+
+        for (let i = 0; i < spineItems.length; i++) {
+          const item = spineItems[i];
+          let size = 1; // Mặc định nếu không lấy được dung lượng
+          if (zip && zip.files && item.path && zip.files[item.path]) {
+            const f = zip.files[item.path];
+            if (f._data && typeof f._data.uncompressedSize === 'number') {
+              size = f._data.uncompressedSize; // Lấy dung lượng chữ thực tế của chương
+            } else if (f._data && typeof f._data.compressedSize === 'number') {
+              size = f._data.compressedSize;
+            }
+          }
+          ctx.totalSpineSize += size;
+          ctx.spineSizes.push(ctx.totalSpineSize); // Cộng dồn dung lượng qua từng chương
+        }
+      } catch (e) {
+        console.error("Lỗi tính dung lượng sách:", e);
+      }
     });
+
     ctx.rendition.on('relocated', location => {
       localStorage.setItem(`location-${ctx.currentBookId}`, location.start.cfi);
       updateChapterInfo(location);
@@ -169,7 +194,28 @@ export function updateChapterInfo(location) {
     const totalChapters = flatToc.length;
     const currentIndex = flatToc.findIndex(item => item.href === currentChapter.href) + 1;
 
-    ctx.chapterInfoEl.textContent = `${currentIndex}/${totalChapters} - ${currentChapter.label.trim()}`;
+    // --- TÍNH % NỘI DUNG DỰA TRÊN DUNG LƯỢNG THỰC TẾ ---
+    let percentText = "";
+    if (ctx.spineSizes && ctx.totalSpineSize > 0 && location && location.start && typeof location.start.index === 'number') {
+      const idx = location.start.index;
+      const prevSize = idx > 0 ? ctx.spineSizes[idx - 1] : 0;
+      const currentChapterSize = ctx.spineSizes[idx] - prevSize;
+
+      // Tiến độ đọc hiện tại bên trong chương đó (ví dụ đang cuộn được bao nhiêu %)
+      const intraProgress = location.start.percentage || 0;
+
+      const currentProgressSize = prevSize + (currentChapterSize * intraProgress);
+      const pct = (currentProgressSize / ctx.totalSpineSize) * 100;
+      percentText = ` (${pct.toFixed(2)}%)`; // Làm tròn lấy 2 số thập phân, VD: (2.02%)
+    } else {
+      // Phương án dự phòng nếu sách bị lỗi cấu trúc dung lượng
+      const pct = (currentIndex / totalChapters) * 100;
+      percentText = ` (${pct.toFixed(2)}%)`;
+    }
+
+    // Hiển thị kết quả ra màn hình theo cấu trúc yêu cầu của bạn
+    ctx.chapterInfoEl.textContent = `${currentIndex}/${totalChapters}${percentText} - ${currentChapter.label.trim()}`;
+
 
     // 1. Tự động lấy và xử lý TÊN TRUYỆN thành dạng viết liền không dấu (Ví dụ: "de-ba")
     const bookTitle = ctx.book.package.metadata.title || "truyen";
@@ -350,24 +396,45 @@ document.getElementById('search-btn').addEventListener('click', async () => {
   const query = prompt("Nhập từ khóa cần tìm trong sách:");
   if (!query) return;
 
-  // Hiển thị thông báo đang tìm kiếm (do tìm toàn bộ sách sẽ mất chút thời gian)
   const originalText = ctx.chapterInfoEl.textContent;
-  ctx.chapterInfoEl.textContent = "Đang tìm kiếm...";
-
-  // Quét toàn bộ nội dung trong các chương
   let results = [];
-  for (let spineItem of ctx.book.spine.spineItems) {
-    let content = await spineItem.load(ctx.book.load.bind(ctx.book));
-    let matches = spineItem.find(query);
-    results = results.concat(matches);
+  const spineItems = ctx.book.spine.spineItems || [];
+  const total = spineItems.length;
+
+  // Vòng lặp quét từng chương một cách thông minh
+  for (let i = 0; i < total; i++) {
+    const spineItem = spineItems[i];
+
+    // CỨ MỖI 15 CHƯƠNG: Cập nhật tiến độ (% tìm kiếm) lên màn hình và cho máy nghỉ 1 chút
+    if (i % 15 === 0) {
+      ctx.chapterInfoEl.textContent = `Đang tìm kiếm: ${Math.round((i / total) * 100)}%...`;
+      // Lệnh này ép trình duyệt dừng lại một phần triệu giây để "thở" và cập nhật chữ lên màn hình, chống đơ máy
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    try {
+      // Tải nội dung chương
+      let content = await spineItem.load(ctx.book.load.bind(ctx.book));
+      let matches = spineItem.find(query);
+      if (matches && matches.length > 0) {
+        results = results.concat(matches);
+      }
+    } catch (err) {
+      console.error("Lỗi khi quét chương:", err);
+    } finally {
+      // HÀNH ĐỘNG QUAN TRỌNG NHẤT: Giải phóng RAM ngay sau khi quét xong chương đó để chống sập web
+      if (spineItem.unload) {
+        spineItem.unload();
+      }
+    }
   }
 
-  ctx.chapterInfoEl.textContent = originalText; // Trả lại text cũ
+  // Trả lại thanh tiêu đề ban đầu sau khi tìm xong
+  ctx.chapterInfoEl.textContent = originalText;
 
   if (results.length === 0) {
     alert("Không tìm thấy kết quả nào!");
   } else {
-    // Nếu tìm thấy, chuyển tới kết quả đầu tiên
     alert(`Tìm thấy ${results.length} kết quả. Đang chuyển đến vị trí đầu tiên...`);
     ctx.rendition.display(results[0].cfi);
   }
